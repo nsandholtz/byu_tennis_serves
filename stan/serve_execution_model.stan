@@ -87,6 +87,7 @@ model {
     target += normal_lcdf(alpha[p, i, j] | mu[p, i, j][1], tau[p, i, j][1]);
   }
   
+  // Prior specification
   for (p in 1:N_p) {
     for (i in 1:N_i) {
       for (j in 1:N_j) {
