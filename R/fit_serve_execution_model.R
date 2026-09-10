@@ -85,7 +85,6 @@ fit$summary()
 
 # Saving MCMC output ----------------------------------------------------
 
-
 fit$save_output_files(dir = "model_output/",
                       basename = "serve_execution_mcmc",
                       timestamp = FALSE)
