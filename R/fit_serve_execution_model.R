@@ -2,7 +2,8 @@
 # Fit the hierarchical serve-execution model (Section 4 of the paper).
 #
 # Reads  : data/serves.csv, data/targets.csv
-# Writes : model_output/serve_execution_mcmc.rds  
+# Writes : model_output/serve_execution_mcmc-{1..4}.csv  (raw CmdStan output)
+#          model_output/posterior_draws_1000.csv         (tidy cell-level draws)
 # =============================================================================
 
 library(cmdstanr)
@@ -74,13 +75,47 @@ fit <- mod$sample(
   chains = 4,
   parallel_chains = 4,
   iter_warmup = 2500,
-  iter_sampling = 2500
+  iter_sampling = 22000, 
+  thin = 88
 )
 
 fit$diagnostic_summary()
 fit$summary()
 
+
+# Saving MCMC output ----------------------------------------------------
+
+
 fit$save_output_files(dir = "model_output/",
                       basename = "serve_execution_mcmc",
                       timestamp = FALSE)
-fit$save_object("model_output/serve_execution_mcmc.rds")
+
+
+# Saving formatted output for easier use --------------------------------
+
+draws <- fit$draws(format = "draws_df")
+
+REGIONS <- tibble(region   = 1:4,
+                  court    = c("Deuce", "Deuce", "Ad", "Ad"),
+                  strategy = c("Wide", "T", "T", "Wide"))
+
+out <- expand_grid(player_id = 1:N_p, serve_period = 1:N_i, region = 1:N_j) %>%
+  pmap_dfr(function(player_id, serve_period, region) {
+    p <- player_id; i <- serve_period; j <- region
+    tibble(
+      draw      = draws$.draw,
+      chain     = draws$.chain,
+      player_id = p, serve_period = i, region = j,
+      mu_x  = draws[[sprintf("mu[%d,%d,%d,1]",  p, i, j)]],
+      mu_y  = draws[[sprintf("mu[%d,%d,%d,2]",  p, i, j)]],
+      tau_x = draws[[sprintf("tau[%d,%d,%d,1]", p, i, j)]],
+      tau_y = draws[[sprintf("tau[%d,%d,%d,2]", p, i, j)]],
+      rho   = draws[[sprintf("rho[%d,%d,%d]",   p, i, j)]],
+      alpha = draws[[sprintf("alpha[%d,%d,%d]", p, i, j)]]
+    )
+  }) %>%
+  left_join(REGIONS, by = "region")
+
+write_csv(out, "model_output/posterior_draws_1000.csv")
+
+
